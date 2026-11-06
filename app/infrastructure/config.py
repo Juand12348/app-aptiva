@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     database_url: str
     cors_origins: list[str] = ["http://localhost:8501"]
+    # Sin un secreto largo la app no arranca: un JWT firmado con un secreto débil se puede falsificar.
+    jwt_secret_key: str = Field(min_length=32)
+    access_token_expire_minutes: int = Field(default=60, gt=0)
 
     @field_validator("database_url")
     @classmethod
