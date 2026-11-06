@@ -59,10 +59,23 @@ class SubmitExamRequest(BaseModel):
     answers: list[AnswerRequest] = Field(max_length=30)
 
 
+class DifficultyScoreResponse(BaseModel):
+    difficulty: str
+    correct: int
+    total: int
+
+
 class ComponentScoreResponse(BaseModel):
     component: str
     score: int
     max_score: int
+    by_difficulty: list[DifficultyScoreResponse]
+
+
+class DiagnosisResponse(BaseModel):
+    strengths: list[str]
+    weaknesses: list[str]
+    recommendations: list[str]
 
 
 class ExamResultResponse(BaseModel):
@@ -70,3 +83,6 @@ class ExamResultResponse(BaseModel):
     total_score: int
     max_score: int
     components: list[ComponentScoreResponse]
+    diagnosis: DiagnosisResponse | None = Field(
+        description="null si Gemini no respondió; se puede regenerar con POST /exams/{exam_id}/diagnosis"
+    )

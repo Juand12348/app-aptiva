@@ -1,22 +1,39 @@
 """Único punto donde la presentación se conecta con la infraestructura."""
 
+from functools import lru_cache
+
 from fastapi import Depends
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
 from app.application.auth import GetCurrentStudent, Login, RegisterStudent
+from app.application.diagnosis import GenerateDiagnosis, RegenerateDiagnosis
 from app.application.exams import StartExam, SubmitExam
 from app.domain.entities import Student
 from app.domain.exceptions import AuthenticationError
-from app.domain.ports import ExamRepository, QuestionRepository, StudentRepository, TokenService
+from app.domain.ports import (
+    DiagnosisGenerator,
+    DiagnosisRepository,
+    ExamRepository,
+    QuestionRepository,
+    StudentRepository,
+    TokenService,
+)
 from app.infrastructure.config import get_settings
 from app.infrastructure.database import get_session, is_database_reachable
-from app.infrastructure.repositories import SqlExamRepository, SqlQuestionRepository, SqlStudentRepository
+from app.infrastructure.gemini import GeminiDiagnosisGenerator, create_gemini_client
+from app.infrastructure.repositories import (
+    SqlDiagnosisRepository,
+    SqlExamRepository,
+    SqlQuestionRepository,
+    SqlStudentRepository,
+)
 from app.infrastructure.security import Argon2PasswordHasher, JwtTokenService
 
 __all__ = [
     "get_current_student",
     "get_login",
+    "get_regenerate_diagnosis",
     "get_register_student",
     "get_start_exam",
     "get_submit_exam",
@@ -40,6 +57,24 @@ def get_exam_repository(session: Session = Depends(get_session)) -> ExamReposito
     return SqlExamRepository(session)
 
 
+def get_diagnosis_repository(session: Session = Depends(get_session)) -> DiagnosisRepository:
+    return SqlDiagnosisRepository(session)
+
+
+@lru_cache
+def get_diagnosis_generator() -> DiagnosisGenerator:
+    settings = get_settings()
+    client = create_gemini_client(settings.gemini_api_key, settings.gemini_timeout_seconds)
+    return GeminiDiagnosisGenerator(client, settings.gemini_model)
+
+
+def get_generate_diagnosis(
+    generator: DiagnosisGenerator = Depends(get_diagnosis_generator),
+    diagnoses: DiagnosisRepository = Depends(get_diagnosis_repository),
+) -> GenerateDiagnosis:
+    return GenerateDiagnosis(generator, diagnoses)
+
+
 def get_start_exam(
     questions: QuestionRepository = Depends(get_question_repository),
     exams: ExamRepository = Depends(get_exam_repository),
@@ -47,8 +82,18 @@ def get_start_exam(
     return StartExam(questions, exams)
 
 
-def get_submit_exam(exams: ExamRepository = Depends(get_exam_repository)) -> SubmitExam:
-    return SubmitExam(exams)
+def get_submit_exam(
+    exams: ExamRepository = Depends(get_exam_repository),
+    diagnosis: GenerateDiagnosis = Depends(get_generate_diagnosis),
+) -> SubmitExam:
+    return SubmitExam(exams, diagnosis)
+
+
+def get_regenerate_diagnosis(
+    exams: ExamRepository = Depends(get_exam_repository),
+    diagnosis: GenerateDiagnosis = Depends(get_generate_diagnosis),
+) -> RegenerateDiagnosis:
+    return RegenerateDiagnosis(exams, diagnosis)
 
 
 def get_token_service() -> TokenService:

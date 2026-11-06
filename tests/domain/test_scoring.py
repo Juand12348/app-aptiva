@@ -32,7 +32,7 @@ def exam_with(components: list[str]) -> ExamToGrade:
     return ExamToGrade(
         1,
         ExamStatus.IN_PROGRESS,
-        [GradableQuestion(i, c, frozenset({i * 10, i * 10 + 1}), i * 10 + 1) for i, c in enumerate(components, 1)],
+        [GradableQuestion(i, c, "Fácil", frozenset({i * 10, i * 10 + 1}), i * 10 + 1) for i, c in enumerate(components, 1)],
     )
 
 
@@ -42,6 +42,7 @@ def test_grade_counts_unanswered_as_incorrect_and_scores_by_component() -> None:
     assert result.total_score == 2
     assert result.max_score == 4
     assert [(c.component, c.score, c.max_score) for c in result.components] == [("A", 1, 2), ("B", 1, 2)]
+    assert [(d.difficulty, d.correct, d.total) for d in result.components[0].by_difficulty] == [("Fácil", 1, 2)]
     assert [a.is_correct for a in result.answers] == [True, False, True, False]
     assert result.answers[3].selected_option_id is None
 

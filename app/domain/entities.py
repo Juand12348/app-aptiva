@@ -45,6 +45,7 @@ class StartedExam:
 class GradableQuestion:
     id: int
     component: str
+    difficulty: str
     option_ids: frozenset[int]
     correct_option_id: int
 
@@ -64,10 +65,18 @@ class GradedAnswer:
 
 
 @dataclass(frozen=True)
+class DifficultyScore:
+    difficulty: str
+    correct: int
+    total: int
+
+
+@dataclass(frozen=True)
 class ComponentScore:
     component: str
     score: int
     max_score: int
+    by_difficulty: list[DifficultyScore]
 
 
 @dataclass(frozen=True)
@@ -77,3 +86,16 @@ class ExamResult:
     max_score: int
     components: list[ComponentScore]
     answers: list[GradedAnswer]
+
+
+@dataclass(frozen=True)
+class Diagnosis:
+    strengths: list[str]
+    weaknesses: list[str]
+    recommendations: list[str]
+
+
+@dataclass(frozen=True)
+class SubmittedExam:
+    result: ExamResult
+    diagnosis: Diagnosis | None  # None si Gemini falló: los puntajes ya quedaron guardados

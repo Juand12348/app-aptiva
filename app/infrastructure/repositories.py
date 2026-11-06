@@ -4,20 +4,26 @@ from sqlalchemy import and_, bindparam, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from sqlalchemy.dialects.postgresql import insert
+
 from app.domain.entities import (
+    Diagnosis,
     ExamResult,
     ExamStatus,
     ExamToGrade,
     GradableQuestion,
+    GradedAnswer,
     Option,
     Question,
     StartedExam,
     Student,
 )
 from app.domain.exceptions import ConflictError
+from app.domain.scoring import summarize
 from app.infrastructure.models import (
     Componente,
     DetalleIntento,
+    DiagnosticoIA,
     Estudiante,
     IntentoExamen,
     NivelDificultad,
@@ -138,19 +144,22 @@ class SqlExamRepository:
             select(
                 DetalleIntento.id_pregunta,
                 Componente.nombre,
+                NivelDificultad.nombre,
                 OpcionRespuesta.id_opcion,
                 OpcionRespuesta.es_correcta,
             )
             .join(Componente, Componente.id_componente == DetalleIntento.id_componente)
+            .join(Pregunta, Pregunta.id_pregunta == DetalleIntento.id_pregunta)
+            .join(NivelDificultad, NivelDificultad.id_nivel == Pregunta.id_nivel)
             .join(OpcionRespuesta, OpcionRespuesta.id_pregunta == DetalleIntento.id_pregunta)
             .where(DetalleIntento.id_intento == exam_id)
             .order_by(DetalleIntento.orden, OpcionRespuesta.id_opcion)
         )
-        components: dict[int, str] = {}
+        labels: dict[int, tuple[str, str]] = {}
         option_ids: dict[int, set[int]] = defaultdict(set)
         correct: dict[int, int] = {}
-        for question_id, component, option_id, is_correct in rows:
-            components[question_id] = component
+        for question_id, component, difficulty, option_id, is_correct in rows:
+            labels[question_id] = (component, difficulty)
             option_ids[question_id].add(option_id)
             if is_correct:
                 correct[question_id] = option_id
@@ -159,9 +168,38 @@ class SqlExamRepository:
             id=exam_id,
             status=STATUS_FROM_DB[status],
             questions=[
-                GradableQuestion(question_id, component, frozenset(option_ids[question_id]), correct[question_id])
-                for question_id, component in components.items()  # dict conserva el orden de `orden`
+                GradableQuestion(question_id, component, difficulty, frozenset(option_ids[question_id]), correct[question_id])
+                for question_id, (component, difficulty) in labels.items()  # dict conserva el orden de `orden`
             ],
+        )
+
+    def get_status(self, exam_id: int, student_id: int) -> ExamStatus | None:
+        status = self.session.scalar(
+            select(IntentoExamen.estado).where(
+                IntentoExamen.id_intento == exam_id, IntentoExamen.id_estudiante == student_id
+            )
+        )
+        return STATUS_FROM_DB[status] if status else None
+
+    def get_result(self, exam_id: int) -> ExamResult:
+        rows = self.session.execute(
+            select(
+                DetalleIntento.id_pregunta,
+                DetalleIntento.id_opcion_seleccionada,
+                DetalleIntento.es_correcta,
+                Componente.nombre,
+                NivelDificultad.nombre,
+            )
+            .join(Componente, Componente.id_componente == DetalleIntento.id_componente)
+            .join(Pregunta, Pregunta.id_pregunta == DetalleIntento.id_pregunta)
+            .join(NivelDificultad, NivelDificultad.id_nivel == Pregunta.id_nivel)
+            .where(DetalleIntento.id_intento == exam_id)
+            .order_by(DetalleIntento.orden)
+        ).all()
+        return summarize(
+            exam_id,
+            [(component, difficulty) for *_, component, difficulty in rows],
+            [GradedAnswer(question_id, selected, bool(correct)) for question_id, selected, correct, *_ in rows],
         )
 
     def save_result(self, result: ExamResult) -> None:
@@ -188,5 +226,30 @@ class SqlExamRepository:
                 estado=DB_STATUS[ExamStatus.FINISHED],
                 fecha_fin=func.now(),
                 puntaje_total=result.total_score,
+            )
+        )
+
+
+def join_lines(items: list[str]) -> str:
+    # diagnosticos_ia guarda TEXT: un elemento por línea, así que un elemento no puede contener saltos de línea.
+    return "\n".join(" ".join(item.split()) for item in items if item.strip())
+
+
+class SqlDiagnosisRepository:
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def save(self, exam_id: int, diagnosis: Diagnosis) -> None:
+        values = {
+            "fortalezas": join_lines(diagnosis.strengths),
+            "debilidades": join_lines(diagnosis.weaknesses),
+            "recomendaciones": join_lines(diagnosis.recommendations),
+        }
+        statement = insert(DiagnosticoIA).values(id_intento=exam_id, **values)
+        # Regenerar reemplaza el diagnóstico existente (id_intento es UNIQUE).
+        self.session.execute(
+            statement.on_conflict_do_update(
+                index_elements=[DiagnosticoIA.id_intento],
+                set_={**values, "fecha_generacion": func.now()},
             )
         )

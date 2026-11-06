@@ -3,6 +3,7 @@ from collections import defaultdict
 from datetime import UTC, datetime
 
 from app.domain.entities import (
+    Diagnosis,
     ExamResult,
     ExamStatus,
     ExamToGrade,
@@ -12,9 +13,10 @@ from app.domain.entities import (
     StartedExam,
     Student,
 )
-from app.domain.exceptions import ConflictError
+from app.domain.exceptions import ConflictError, DiagnosisUnavailableError
 
 COMPONENTS = ["Estadística", "Geometría", "Cálculo y Álgebra"]
+DIFFICULTIES = ["Fácil", "Medio", "Difícil"]
 
 
 class InMemoryStudentRepository:
@@ -43,7 +45,8 @@ def make_bank(per_component: int = 12) -> tuple[list[Question], dict[int, int]]:
         for n in range(per_component):
             question_id = index * 100 + n + 1
             options = tuple(Option(question_id * 10 + k, f"Opción {k}") for k in range(4))
-            questions.append(Question(question_id, index + 1, component, "Fácil", f"Pregunta {question_id}", options))
+            difficulty = DIFFICULTIES[n % 3]
+            questions.append(Question(question_id, index + 1, component, difficulty, f"Pregunta {question_id}", options))
             correct[question_id] = question_id * 10 + 2
     return questions, correct
 
@@ -77,7 +80,7 @@ class InMemoryExamRepository:
             exam_id,
             exam["status"],
             [
-                GradableQuestion(q.id, q.component, frozenset(o.id for o in q.options), self.correct[q.id])
+                GradableQuestion(q.id, q.component, q.difficulty, frozenset(o.id for o in q.options), self.correct[q.id])
                 for q in exam["questions"]
             ],
         )
@@ -85,3 +88,32 @@ class InMemoryExamRepository:
     def save_result(self, result: ExamResult) -> None:
         self.exams[result.exam_id]["status"] = ExamStatus.FINISHED
         self.exams[result.exam_id]["result"] = result
+
+    def get_status(self, exam_id: int, student_id: int) -> ExamStatus | None:
+        exam = self.exams.get(exam_id)
+        return exam["status"] if exam and exam["student_id"] == student_id else None
+
+    def get_result(self, exam_id: int) -> ExamResult:
+        return self.exams[exam_id]["result"]
+
+
+class InMemoryDiagnosisRepository:
+    def __init__(self) -> None:
+        self.saved: dict[int, Diagnosis] = {}
+
+    def save(self, exam_id: int, diagnosis: Diagnosis) -> None:
+        self.saved[exam_id] = diagnosis
+
+
+class FakeDiagnosisGenerator:
+    """Sustituye a Gemini en las pruebas. Con fail=True simula una caída de la IA."""
+
+    def __init__(self, fail: bool = False) -> None:
+        self.fail = fail
+        self.calls: list[ExamResult] = []
+
+    def generate(self, result: ExamResult) -> Diagnosis:
+        self.calls.append(result)
+        if self.fail:
+            raise DiagnosisUnavailableError("No se pudo contactar a Gemini")
+        return Diagnosis(["Buen manejo de Geometría"], ["Estadística"], ["Repasa probabilidad", "Practica", "Revisa"])

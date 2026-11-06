@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from app.domain.exceptions import (
     AuthenticationError,
     ConflictError,
+    DiagnosisUnavailableError,
     DomainError,
     InvalidDataError,
     NotFoundError,
@@ -14,6 +15,7 @@ STATUS_BY_ERROR: dict[type[DomainError], int] = {
     ConflictError: status.HTTP_409_CONFLICT,
     InvalidDataError: status.HTTP_422_UNPROCESSABLE_ENTITY,
     AuthenticationError: status.HTTP_401_UNAUTHORIZED,
+    DiagnosisUnavailableError: status.HTTP_503_SERVICE_UNAVAILABLE,
 }
 
 

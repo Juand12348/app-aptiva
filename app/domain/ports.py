@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from app.domain.entities import ExamResult, ExamToGrade, Question, StartedExam, Student
+from app.domain.entities import Diagnosis, ExamResult, ExamStatus, ExamToGrade, Question, StartedExam, Student
 
 
 class StudentRepository(Protocol):
@@ -29,6 +29,26 @@ class ExamRepository(Protocol):
         ...
 
     def save_result(self, result: ExamResult) -> None: ...
+
+    def get_status(self, exam_id: int, student_id: int) -> ExamStatus | None:
+        """None if missing or owned by another student."""
+        ...
+
+    def get_result(self, exam_id: int) -> ExamResult:
+        """Result of an already finished exam, rebuilt from the stored answers."""
+        ...
+
+
+class DiagnosisRepository(Protocol):
+    def save(self, exam_id: int, diagnosis: Diagnosis) -> None:
+        """Creates or replaces the exam's diagnosis."""
+        ...
+
+
+class DiagnosisGenerator(Protocol):
+    def generate(self, result: ExamResult) -> Diagnosis:
+        """Raises DiagnosisUnavailableError if the AI fails or answers something invalid."""
+        ...
 
 
 class PasswordHasher(Protocol):

@@ -16,3 +16,7 @@ class InvalidDataError(DomainError):
 
 class AuthenticationError(DomainError):
     """Credenciales o token inválidos."""
+
+
+class DiagnosisUnavailableError(DomainError):  # → 503
+    """Gemini no respondió o respondió algo inválido."""

@@ -2,7 +2,14 @@
 
 from collections import Counter, defaultdict
 
-from app.domain.entities import ComponentScore, ExamResult, ExamToGrade, GradedAnswer, Question
+from app.domain.entities import (
+    ComponentScore,
+    DifficultyScore,
+    ExamResult,
+    ExamToGrade,
+    GradedAnswer,
+    Question,
+)
 from app.domain.exceptions import InvalidDataError
 
 QUESTIONS_PER_COMPONENT = 10
@@ -32,19 +39,31 @@ def grade_exam(exam: ExamToGrade, answers: dict[int, int]) -> ExamResult:
     graded = [
         GradedAnswer(q.id, answers.get(q.id), answers.get(q.id) == q.correct_option_id) for q in exam.questions
     ]
-    correct_by_component: dict[str, int] = defaultdict(int)
-    total_by_component: dict[str, int] = defaultdict(int)
-    for question, answer in zip(exam.questions, graded, strict=True):
-        total_by_component[question.component] += 1
-        correct_by_component[question.component] += answer.is_correct
+    return summarize(exam.id, [(q.component, q.difficulty) for q in exam.questions], graded)
+
+
+def summarize(exam_id: int, labels: list[tuple[str, str]], graded: list[GradedAnswer]) -> ExamResult:
+    """Puntaje global, por componente y por dificultad. `labels[i]` = (componente, dificultad) de `graded[i]`."""
+    # tally[componente][dificultad] = [correctas, total]
+    tally: dict[str, dict[str, list[int]]] = defaultdict(lambda: defaultdict(lambda: [0, 0]))
+    for (component, difficulty), answer in zip(labels, graded, strict=True):
+        cell = tally[component][difficulty]
+        cell[0] += answer.is_correct
+        cell[1] += 1
 
     components = [
-        ComponentScore(name, correct_by_component[name], total_by_component[name]) for name in sorted(total_by_component)
+        ComponentScore(
+            component=component,
+            score=sum(correct for correct, _ in by_level.values()),
+            max_score=sum(total for _, total in by_level.values()),
+            by_difficulty=[DifficultyScore(level, *by_level[level]) for level in sorted(by_level)],
+        )
+        for component, by_level in sorted(tally.items())
     ]
     return ExamResult(
-        exam_id=exam.id,
+        exam_id=exam_id,
         total_score=sum(c.score for c in components),
-        max_score=len(exam.questions),
+        max_score=len(graded),
         components=components,
         answers=graded,
     )
