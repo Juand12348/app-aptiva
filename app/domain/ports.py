@@ -1,6 +1,15 @@
 from typing import Protocol
 
-from app.domain.entities import Diagnosis, ExamResult, ExamStatus, ExamToGrade, Question, StartedExam, Student
+from app.domain.entities import (
+    Diagnosis,
+    ExamHistoryItem,
+    ExamResult,
+    ExamStatus,
+    ExamToGrade,
+    Question,
+    StartedExam,
+    Student,
+)
 
 
 class StudentRepository(Protocol):
@@ -38,11 +47,17 @@ class ExamRepository(Protocol):
         """Result of an already finished exam, rebuilt from the stored answers."""
         ...
 
+    def list_finished(self, student_id: int) -> list[ExamHistoryItem]:
+        """Finished exams of the student, most recent first."""
+        ...
+
 
 class DiagnosisRepository(Protocol):
     def save(self, exam_id: int, diagnosis: Diagnosis) -> None:
         """Creates or replaces the exam's diagnosis."""
         ...
+
+    def get(self, exam_id: int) -> Diagnosis | None: ...
 
 
 class DiagnosisGenerator(Protocol):

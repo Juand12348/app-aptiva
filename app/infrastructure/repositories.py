@@ -8,6 +8,7 @@ from sqlalchemy.dialects.postgresql import insert
 
 from app.domain.entities import (
     Diagnosis,
+    ExamHistoryItem,
     ExamResult,
     ExamStatus,
     ExamToGrade,
@@ -182,8 +183,34 @@ class SqlExamRepository:
         return STATUS_FROM_DB[status] if status else None
 
     def get_result(self, exam_id: int) -> ExamResult:
+        return self._results_for([exam_id])[exam_id]
+
+    def list_finished(self, student_id: int) -> list[ExamHistoryItem]:
+        attempts = self.session.execute(
+            select(
+                IntentoExamen.id_intento,
+                IntentoExamen.fecha_inicio,
+                IntentoExamen.fecha_fin,
+                DiagnosticoIA.id_diagnostico.is_not(None).label("has_diagnosis"),
+            )
+            .outerjoin(DiagnosticoIA, DiagnosticoIA.id_intento == IntentoExamen.id_intento)
+            .where(
+                IntentoExamen.id_estudiante == student_id,
+                IntentoExamen.estado == DB_STATUS[ExamStatus.FINISHED],
+            )
+            # Desempate por id: now() es la hora de inicio de la transacción y puede repetirse.
+            .order_by(IntentoExamen.fecha_fin.desc(), IntentoExamen.id_intento.desc())
+        ).all()
+        results = self._results_for([attempt.id_intento for attempt in attempts])
+        return [
+            ExamHistoryItem(a.fecha_inicio, a.fecha_fin, results[a.id_intento], a.has_diagnosis) for a in attempts
+        ]
+
+    def _results_for(self, exam_ids: list[int]) -> dict[int, ExamResult]:
+        """Reconstruye los resultados de varios exámenes con una sola consulta (sin N+1 en el historial)."""
         rows = self.session.execute(
             select(
+                DetalleIntento.id_intento,
                 DetalleIntento.id_pregunta,
                 DetalleIntento.id_opcion_seleccionada,
                 DetalleIntento.es_correcta,
@@ -193,14 +220,15 @@ class SqlExamRepository:
             .join(Componente, Componente.id_componente == DetalleIntento.id_componente)
             .join(Pregunta, Pregunta.id_pregunta == DetalleIntento.id_pregunta)
             .join(NivelDificultad, NivelDificultad.id_nivel == Pregunta.id_nivel)
-            .where(DetalleIntento.id_intento == exam_id)
-            .order_by(DetalleIntento.orden)
-        ).all()
-        return summarize(
-            exam_id,
-            [(component, difficulty) for *_, component, difficulty in rows],
-            [GradedAnswer(question_id, selected, bool(correct)) for question_id, selected, correct, *_ in rows],
+            .where(DetalleIntento.id_intento.in_(exam_ids))
+            .order_by(DetalleIntento.id_intento, DetalleIntento.orden)
         )
+        labels: dict[int, list[tuple[str, str]]] = defaultdict(list)
+        answers: dict[int, list[GradedAnswer]] = defaultdict(list)
+        for exam_id, question_id, selected, correct, component, difficulty in rows:
+            labels[exam_id].append((component, difficulty))
+            answers[exam_id].append(GradedAnswer(question_id, selected, bool(correct)))
+        return {exam_id: summarize(exam_id, labels[exam_id], answers[exam_id]) for exam_id in exam_ids}
 
     def save_result(self, result: ExamResult) -> None:
         detail = DetalleIntento.__table__
@@ -253,3 +281,13 @@ class SqlDiagnosisRepository:
                 set_={**values, "fecha_generacion": func.now()},
             )
         )
+
+    def get(self, exam_id: int) -> Diagnosis | None:
+        row = self.session.scalar(select(DiagnosticoIA).where(DiagnosticoIA.id_intento == exam_id))
+        if row is None:
+            return None
+        return Diagnosis(split_lines(row.fortalezas), split_lines(row.debilidades), split_lines(row.recomendaciones))
+
+
+def split_lines(text_value: str | None) -> list[str]:
+    return [line for line in (text_value or "").split("\n") if line.strip()]

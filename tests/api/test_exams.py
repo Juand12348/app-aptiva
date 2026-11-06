@@ -40,7 +40,7 @@ def setup(
     generator: FakeDiagnosisGenerator, diagnoses: InMemoryDiagnosisRepository
 ) -> Iterator[tuple[TestClient, dict[int, int]]]:
     questions, correct = make_bank()
-    exams = InMemoryExamRepository(correct)
+    exams = InMemoryExamRepository(correct, diagnoses)
     app.dependency_overrides[get_question_repository] = lambda: FakeQuestionRepository(questions)
     app.dependency_overrides[get_exam_repository] = lambda: exams
     app.dependency_overrides[get_diagnosis_generator] = lambda: generator
@@ -197,3 +197,68 @@ def test_regenerate_diagnosis_errors(setup: tuple[TestClient, dict[int, int]]) -
     assert client.post(f"{EXAMS}/999/diagnosis").status_code == 404
     app.dependency_overrides[get_current_student] = lambda: LUIS
     assert client.post(f"{EXAMS}/{exam['exam_id']}/diagnosis").status_code == 404
+
+
+def test_result_matches_submit_response(setup: tuple[TestClient, dict[int, int]]) -> None:
+    client, correct = setup
+    exam = start(client)
+    submitted = submit(client, exam["exam_id"], all_correct(exam, correct)[:12]).json()
+    response = client.get(f"{EXAMS}/{exam['exam_id']}/result")
+    assert response.status_code == 200
+    assert response.json() == submitted
+
+
+def test_result_shows_regenerated_diagnosis(
+    setup: tuple[TestClient, dict[int, int]], generator: FakeDiagnosisGenerator
+) -> None:
+    client, _ = setup
+    generator.fail = True
+    exam = start(client)
+    submit(client, exam["exam_id"], [])
+    assert client.get(f"{EXAMS}/{exam['exam_id']}/result").json()["diagnosis"] is None
+    generator.fail = False
+    client.post(f"{EXAMS}/{exam['exam_id']}/diagnosis")
+    assert client.get(f"{EXAMS}/{exam['exam_id']}/result").json()["diagnosis"] is not None
+
+
+def test_result_errors(setup: tuple[TestClient, dict[int, int]]) -> None:
+    client, _ = setup
+    exam = start(client)
+    response = client.get(f"{EXAMS}/{exam['exam_id']}/result")
+    assert response.status_code == 409
+    assert response.json() == {"detail": "El examen aún no ha sido enviado"}
+    assert client.get(f"{EXAMS}/999/result").status_code == 404
+    submit(client, exam["exam_id"], [])
+    app.dependency_overrides[get_current_student] = lambda: LUIS
+    assert client.get(f"{EXAMS}/{exam['exam_id']}/result").status_code == 404
+
+
+def test_history_lists_only_finished_exams_newest_first(
+    setup: tuple[TestClient, dict[int, int]], generator: FakeDiagnosisGenerator
+) -> None:
+    client, correct = setup
+    first = start(client)
+    submit(client, first["exam_id"], all_correct(first, correct))
+    generator.fail = True
+    second = start(client)
+    submit(client, second["exam_id"], [])
+    start(client)  # en curso: no aparece en el historial
+
+    response = client.get("/api/v1/students/me/exams")
+    assert response.status_code == 200
+    history = response.json()
+    assert [item["exam_id"] for item in history] == [second["exam_id"], first["exam_id"]]
+    assert [item["total_score"] for item in history] == [0, 30]
+    assert [item["has_diagnosis"] for item in history] == [False, True]
+    assert history[1]["finished_at"] >= history[1]["started_at"]
+    assert [c["score"] for c in history[1]["components"]] == [10, 10, 10]
+
+
+def test_history_is_per_student(setup: tuple[TestClient, dict[int, int]]) -> None:
+    client, _ = setup
+    exam = start(client)
+    submit(client, exam["exam_id"], [])
+    app.dependency_overrides[get_current_student] = lambda: LUIS
+    assert client.get("/api/v1/students/me/exams").json() == []
+    del app.dependency_overrides[get_current_student]
+    assert client.get("/api/v1/students/me/exams").status_code == 401

@@ -99,3 +99,11 @@ class Diagnosis:
 class SubmittedExam:
     result: ExamResult
     diagnosis: Diagnosis | None  # None si Gemini falló: los puntajes ya quedaron guardados
+
+
+@dataclass(frozen=True)
+class ExamHistoryItem:
+    started_at: datetime
+    finished_at: datetime
+    result: ExamResult
+    has_diagnosis: bool

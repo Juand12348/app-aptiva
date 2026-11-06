@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, status
 
 from app.application.diagnosis import RegenerateDiagnosis
-from app.application.exams import StartExam, SubmitExam
+from app.application.exams import GetExamResult, StartExam, SubmitExam
 from app.domain.entities import Diagnosis, ExamResult, Student
 from app.domain.exceptions import InvalidDataError
 from app.presentation.dependencies import (
     get_current_student,
+    get_get_exam_result,
     get_regenerate_diagnosis,
     get_start_exam,
     get_submit_exam,
@@ -30,23 +31,27 @@ def to_diagnosis_response(diagnosis: Diagnosis) -> DiagnosisResponse:
     )
 
 
+def to_component_responses(result: ExamResult) -> list[ComponentScoreResponse]:
+    return [
+        ComponentScoreResponse(
+            component=c.component,
+            score=c.score,
+            max_score=c.max_score,
+            by_difficulty=[
+                DifficultyScoreResponse(difficulty=d.difficulty, correct=d.correct, total=d.total)
+                for d in c.by_difficulty
+            ],
+        )
+        for c in result.components
+    ]
+
+
 def to_result_response(result: ExamResult, diagnosis: Diagnosis | None) -> ExamResultResponse:
     return ExamResultResponse(
         exam_id=result.exam_id,
         total_score=result.total_score,
         max_score=result.max_score,
-        components=[
-            ComponentScoreResponse(
-                component=c.component,
-                score=c.score,
-                max_score=c.max_score,
-                by_difficulty=[
-                    DifficultyScoreResponse(difficulty=d.difficulty, correct=d.correct, total=d.total)
-                    for d in c.by_difficulty
-                ],
-            )
-            for c in result.components
-        ],
+        components=to_component_responses(result),
         diagnosis=to_diagnosis_response(diagnosis) if diagnosis else None,
     )
 
@@ -95,6 +100,20 @@ def submit_exam(
         raise InvalidDataError("Hay preguntas respondidas más de una vez")
     submitted = use_case.execute(student.id, exam_id, answers)
     return to_result_response(submitted.result, submitted.diagnosis)
+
+
+@router.get(
+    "/{exam_id}/result",
+    response_model=ExamResultResponse,
+    summary="Resultado de un examen enviado: puntajes y diagnóstico (datos del dashboard)",
+)
+def get_exam_result(
+    exam_id: int,
+    student: Student = Depends(get_current_student),
+    use_case: GetExamResult = Depends(get_get_exam_result),
+) -> ExamResultResponse:
+    report = use_case.execute(student.id, exam_id)
+    return to_result_response(report.result, report.diagnosis)
 
 
 @router.post(

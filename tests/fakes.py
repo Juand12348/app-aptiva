@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 
 from app.domain.entities import (
     Diagnosis,
+    ExamHistoryItem,
     ExamResult,
     ExamStatus,
     ExamToGrade,
@@ -63,14 +64,18 @@ class FakeQuestionRepository:
 
 
 class InMemoryExamRepository:
-    def __init__(self, correct: dict[int, int]) -> None:
+    def __init__(self, correct: dict[int, int], diagnoses: "InMemoryDiagnosisRepository | None" = None) -> None:
         self.correct = correct
+        self.diagnoses = diagnoses or InMemoryDiagnosisRepository()
         self.exams: dict[int, dict] = {}
 
     def create(self, student_id: int, questions: list[Question]) -> StartedExam:
         exam_id = len(self.exams) + 1
-        self.exams[exam_id] = {"student_id": student_id, "status": ExamStatus.IN_PROGRESS, "questions": questions}
-        return StartedExam(exam_id, datetime.now(UTC), questions)
+        started_at = datetime.now(UTC)
+        self.exams[exam_id] = {
+            "student_id": student_id, "status": ExamStatus.IN_PROGRESS, "questions": questions, "started_at": started_at
+        }
+        return StartedExam(exam_id, started_at, questions)
 
     def get_for_grading(self, exam_id: int, student_id: int) -> ExamToGrade | None:
         exam = self.exams.get(exam_id)
@@ -88,6 +93,7 @@ class InMemoryExamRepository:
     def save_result(self, result: ExamResult) -> None:
         self.exams[result.exam_id]["status"] = ExamStatus.FINISHED
         self.exams[result.exam_id]["result"] = result
+        self.exams[result.exam_id]["finished_at"] = datetime.now(UTC)
 
     def get_status(self, exam_id: int, student_id: int) -> ExamStatus | None:
         exam = self.exams.get(exam_id)
@@ -96,6 +102,17 @@ class InMemoryExamRepository:
     def get_result(self, exam_id: int) -> ExamResult:
         return self.exams[exam_id]["result"]
 
+    def list_finished(self, student_id: int) -> list[ExamHistoryItem]:
+        finished = [
+            (exam_id, e) for exam_id, e in self.exams.items()
+            if e["student_id"] == student_id and e["status"] is ExamStatus.FINISHED
+        ]
+        finished.sort(key=lambda pair: pair[1]["finished_at"], reverse=True)
+        return [
+            ExamHistoryItem(e["started_at"], e["finished_at"], e["result"], exam_id in self.diagnoses.saved)
+            for exam_id, e in finished
+        ]
+
 
 class InMemoryDiagnosisRepository:
     def __init__(self) -> None:
@@ -103,6 +120,9 @@ class InMemoryDiagnosisRepository:
 
     def save(self, exam_id: int, diagnosis: Diagnosis) -> None:
         self.saved[exam_id] = diagnosis
+
+    def get(self, exam_id: int) -> Diagnosis | None:
+        return self.saved.get(exam_id)
 
 
 class FakeDiagnosisGenerator:

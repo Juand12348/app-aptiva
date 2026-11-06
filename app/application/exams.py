@@ -1,7 +1,7 @@
 from app.application.diagnosis import GenerateDiagnosis
-from app.domain.entities import ExamStatus, StartedExam, SubmittedExam
+from app.domain.entities import ExamHistoryItem, ExamStatus, StartedExam, SubmittedExam
 from app.domain.exceptions import ConflictError, NotFoundError
-from app.domain.ports import ExamRepository, QuestionRepository
+from app.domain.ports import DiagnosisRepository, ExamRepository, QuestionRepository
 from app.domain.scoring import QUESTIONS_PER_COMPONENT, arrange_exam, grade_exam
 
 
@@ -29,3 +29,25 @@ class SubmitExam:
         result = grade_exam(exam, answers)
         self.exams.save_result(result)
         return SubmittedExam(result, self.diagnosis.try_for_result(result))
+
+
+class GetExamResult:
+    def __init__(self, exams: ExamRepository, diagnoses: DiagnosisRepository) -> None:
+        self.exams = exams
+        self.diagnoses = diagnoses
+
+    def execute(self, student_id: int, exam_id: int) -> SubmittedExam:
+        status = self.exams.get_status(exam_id, student_id)
+        if status is None:
+            raise NotFoundError("Examen no encontrado")
+        if status is not ExamStatus.FINISHED:
+            raise ConflictError("El examen aún no ha sido enviado")
+        return SubmittedExam(self.exams.get_result(exam_id), self.diagnoses.get(exam_id))
+
+
+class ListStudentExams:
+    def __init__(self, exams: ExamRepository) -> None:
+        self.exams = exams
+
+    def execute(self, student_id: int) -> list[ExamHistoryItem]:
+        return self.exams.list_finished(student_id)

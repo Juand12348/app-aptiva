@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.application.auth import GetCurrentStudent, Login, RegisterStudent
 from app.application.diagnosis import GenerateDiagnosis, RegenerateDiagnosis
-from app.application.exams import StartExam, SubmitExam
+from app.application.exams import GetExamResult, ListStudentExams, StartExam, SubmitExam
 from app.domain.entities import Student
 from app.domain.exceptions import AuthenticationError
 from app.domain.ports import (
@@ -32,6 +32,8 @@ from app.infrastructure.security import Argon2PasswordHasher, JwtTokenService
 
 __all__ = [
     "get_current_student",
+    "get_get_exam_result",
+    "get_list_student_exams",
     "get_login",
     "get_regenerate_diagnosis",
     "get_register_student",
@@ -87,6 +89,17 @@ def get_submit_exam(
     diagnosis: GenerateDiagnosis = Depends(get_generate_diagnosis),
 ) -> SubmitExam:
     return SubmitExam(exams, diagnosis)
+
+
+def get_get_exam_result(
+    exams: ExamRepository = Depends(get_exam_repository),
+    diagnoses: DiagnosisRepository = Depends(get_diagnosis_repository),
+) -> GetExamResult:
+    return GetExamResult(exams, diagnoses)
+
+
+def get_list_student_exams(exams: ExamRepository = Depends(get_exam_repository)) -> ListStudentExams:
+    return ListStudentExams(exams)
 
 
 def get_regenerate_diagnosis(

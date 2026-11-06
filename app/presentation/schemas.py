@@ -86,3 +86,13 @@ class ExamResultResponse(BaseModel):
     diagnosis: DiagnosisResponse | None = Field(
         description="null si Gemini no respondió; se puede regenerar con POST /exams/{exam_id}/diagnosis"
     )
+
+
+class ExamHistoryItemResponse(BaseModel):
+    exam_id: int
+    started_at: datetime
+    finished_at: datetime
+    total_score: int
+    max_score: int
+    components: list[ComponentScoreResponse]
+    has_diagnosis: bool
