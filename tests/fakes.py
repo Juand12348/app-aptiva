@@ -107,7 +107,7 @@ class InMemoryExamRepository:
             (exam_id, e) for exam_id, e in self.exams.items()
             if e["student_id"] == student_id and e["status"] is ExamStatus.FINISHED
         ]
-        finished.sort(key=lambda pair: pair[1]["finished_at"], reverse=True)
+        finished.sort(key=lambda pair: (pair[1]["finished_at"], pair[0]), reverse=True)  # mismo desempate que la BD
         return [
             ExamHistoryItem(e["started_at"], e["finished_at"], e["result"], exam_id in self.diagnoses.saved)
             for exam_id, e in finished

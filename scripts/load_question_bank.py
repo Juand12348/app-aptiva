@@ -123,6 +123,7 @@ def main() -> int:
         return 0
 
     with engine.begin() as connection:  # una transacción: o se carga todo o nada
+        # f-string seguro: los nombres salen de la constante BANK_TABLES, nunca de datos externos.
         existing = {table: connection.execute(text(f"SELECT count(*) FROM {table}")).scalar_one() for table in BANK_TABLES}
         if any(existing.values()):
             print("El banco ya tiene datos, no se cargó nada:", existing)

@@ -350,12 +350,14 @@ Un archivo por capa y módulo. Si uno pasa de ~300 líneas se divide en paquete;
 
 ## 10. Criterios de aceptación
 
-- [ ] Alembic queda marcado sobre el esquema existente y `0002_student_password` se aplica sin tocar ninguna otra tabla.
-- [ ] La verificación del banco confirma 50/50/50, 4 opciones y 1 correcta por pregunta.
-- [ ] Registro y login funcionan; las contraseñas se guardan con hash; los endpoints protegidos rechazan peticiones sin token o con token inválido (401).
-- [ ] Un estudiante no puede ver ni enviar exámenes de otro (404).
-- [ ] `POST /exams` devuelve 30 preguntas distintas, 10 por componente, sin la respuesta correcta.
-- [ ] `submit` calcula el puntaje global (/30) y por componente (/10) correctamente (cubierto por pruebas).
-- [ ] El diagnóstico se guarda en `diagnoses`; si Gemini falla, los puntajes se conservan y el diagnóstico se puede regenerar.
-- [ ] El historial lista todos los exámenes del estudiante con sus puntajes.
-- [ ] Ningún secreto en el repositorio.
+- [x] Alembic queda marcado sobre el esquema existente y `0002_student_password` se aplica sin tocar ninguna otra tabla.
+- [x] La verificación del banco confirma 50/50/50, 4 opciones y 1 correcta por pregunta.
+- [x] Registro y login funcionan; las contraseñas se guardan con hash; los endpoints protegidos rechazan peticiones sin token o con token inválido (401).
+- [x] Un estudiante no puede ver ni enviar exámenes de otro (404).
+- [x] `POST /exams` devuelve 30 preguntas distintas, 10 por componente, sin la respuesta correcta.
+- [x] `submit` calcula el puntaje global (/30) y por componente (/10) correctamente (cubierto por pruebas).
+- [x] El diagnóstico se guarda en `diagnosticos_ia`; si Gemini falla, los puntajes se conservan y el diagnóstico se puede regenerar.
+- [x] El historial lista todos los exámenes enviados del estudiante con sus puntajes.
+- [x] Ningún secreto en el repositorio.
+
+**Estado (2026-11-06):** criterios verificados con 62 pruebas automáticas y un recorrido HTTP completo contra Neon y Gemini reales (en una transacción revertida, sin dejar datos). Pendiente: probar el bloqueo `FOR UPDATE` con dos envíos simultáneos (requiere escribir datos de prueba en Neon).
