@@ -12,7 +12,7 @@
 
 | ID | Requisito | Módulo |
 |----|-----------|--------|
-| RF-01 | Banco con ≥150 preguntas: 50 Estadística, 50 Geometría, 50 Cálculo y Álgebra (lo carga el equipo de BD en las tablas existentes de Neon) | `question_bank` |
+| RF-01 | Banco con ≥150 preguntas: 50 Estadística, 50 Geometría, 50 Cálculo y Álgebra (ya cargado en Neon) | `question_bank` |
 | RF-02 | Cada pregunta tiene 4 opciones y exactamente 1 correcta | `question_bank` |
 | RF-03 | Cada pregunta tiene dificultad: Fácil, Medio o Difícil | `question_bank` |
 | RF-04 | Generar examen de 30 preguntas: 10 aleatorias por componente, sin repetir | `exams` |
@@ -40,7 +40,7 @@
 2. **Distribución de dificultad:** aleatoria pura dentro de cada componente.
 3. **Login:** sí. Registro con nombre, correo y contraseña; inicio de sesión que devuelve un JWT. Un solo rol (estudiante).
 4. **Frontend:** fuera de este repositorio por ahora. El backend expone los datos del dashboard listos para graficar.
-5. **Banco de preguntas:** lo carga el equipo de BD en las tablas existentes de Neon (hoy vacías). El backend no incluye seed ni CRUD de preguntas.
+5. **Banco de preguntas:** ya cargado en Neon con el script de carga única `scripts/load_question_bank.py` (ver §5.5). La API no incluye CRUD de preguntas.
 6. **Envío de respuestas:** las 30 respuestas en una sola petición al finalizar. Sin responder = incorrecta.
 
 ### 1.4 Esquema existente
@@ -49,7 +49,7 @@ El esquema completo ya existe en Neon (9 tablas, nombres en español) y es la fu
 
 ### 1.5 Fuera de alcance (no se construye)
 
-Frontend, roles/administración, recuperación de contraseña, *refresh tokens*, verificación de correo, CRUD o seed de preguntas, examen adaptativo por dificultad, temporizador, guardado parcial de respuestas, colas o *workers*, caché, despliegue.
+Frontend, roles/administración, recuperación de contraseña, *refresh tokens*, verificación de correo, CRUD de preguntas por API, examen adaptativo por dificultad, temporizador, guardado parcial de respuestas, colas o *workers*, caché, despliegue.
 
 ---
 
@@ -189,7 +189,7 @@ diagnosticos_ia     (id_diagnostico PK, id_intento UNIQUE FK, fortalezas, debili
 | Estados | `CHECK (estado IN ('En progreso','Finalizado','Cancelado'))` | Usa `En progreso → Finalizado`. `Cancelado` no se usa (fuera de alcance) |
 | Un diagnóstico por examen | `UNIQUE (id_intento)` | Regenerar = actualizar la fila existente |
 | Dificultad | Tabla `niveles_dificultad` | Se lee el nombre; el enum del dominio se mapea a los nombres reales |
-| 4 opciones, 1 correcta | "Se validan mediante triggers" (según el comentario del script) | Prueba de integración de solo lectura que lo verifica |
+| 4 opciones, 1 correcta | No hay triggers en la BD | Validado por el script de carga y verificado en Neon; índice único parcial propuesto (§5.5) |
 
 ### 5.3 Brechas y migración necesaria
 
@@ -211,12 +211,14 @@ No se crean tablas nuevas.
 
 ### 5.5 Estado actual y verificaciones
 
-Las 9 tablas existen y están **vacías**. El banco (materias, componentes, niveles y 150 preguntas con sus opciones) lo carga el equipo de BD más adelante.
+**Banco cargado (2026-11-05)** con `python -m scripts.load_question_bank` desde `data/*.json`, en una sola transacción:
+1 materia (Matemáticas), 3 componentes (Estadística, Geometría, Cálculo y Álgebra), 3 niveles (Fácil, Medio, Difícil), 150 preguntas (50 por componente: 10 fáciles, 20 medias, 20 difíciles) y 600 opciones. Verificado en Neon: todas las preguntas tienen 4 opciones y exactamente 1 correcta.
 
-- **Día 1 (solo lectura):** comprobar si existen los triggers de "4 opciones / 1 correcta" (`information_schema.triggers`).
+- **Transformaciones al cargar:** los niveles de los JSON (Básico/Intermedio/Avanzado) se guardaron como Fácil/Medio/Difícil, y los componentes con tilde. Los `id` de los JSON no se usan: la BD genera los suyos.
+- **Opciones mezcladas:** en los JSON la correcta era la B en el 60 % de las preguntas. Al cargar se mezclaron con una semilla fija; ahora la correcta queda en A 33, B 44, C 37 y D 36. La opción de la pregunta 143 que decía "Ambas A y C" se reescribió para no depender del orden.
+- **No hay triggers** en la BD (el comentario del script original los menciona, pero no existen). La regla "1 correcta" solo la garantizan el script de carga y la verificación. Propuesta pendiente de aprobación: agregar `UNIQUE (id_pregunta) WHERE es_correcta` en la migración `0002`.
 - **El backend no depende de nombres fijos de componentes ni de niveles:** los lee de la BD y los muestra tal cual. Por eso no hay enum `Difficulty` en el dominio.
-- **Mientras no esté cargado el banco:** las pruebas usan datos de ejemplo insertados en la *branch* de pruebas (3 componentes × 10+ preguntas).
-- **Al cargar el banco:** correr la prueba de integración de solo lectura: 3 componentes, ≥50 preguntas activas por componente, 4 opciones y 1 correcta por pregunta.
+- **Pruebas de integración:** usan una *branch* de Neon aparte, creada a partir de la principal (ya trae el banco).
 
 ---
 
@@ -307,7 +309,6 @@ Un archivo por capa y módulo. Si uno pasa de ~300 líneas se divide en paquete;
 |---|--------|---------|------------|
 | R1 | **Alembic *autogenerate* propone borrar o alterar tablas reales** porque un modelo no coincide con la BD | Alto | Migración base + `stamp`; revisar cada migración generada a mano; no ejecutar `upgrade` contra Neon sin revisión |
 | R2 | **Datos del banco con errores** (2 correctas, 3 opciones, conteos ≠ 50) o triggers ausentes | Alto | Verificaciones de §5.5; prueba de integración de solo lectura |
-| R2b | **El banco se carga tarde** y bloquea las pruebas reales del examen | Medio | Datos de ejemplo en la *branch* de pruebas desde el día 1; fecha límite de carga: fin de la semana 1 |
 | R3 | **Gemini devuelve formato inválido** | Medio | Salida estructurada + validación Pydantic; `diagnosis = null` y regeneración |
 | R4 | **Cuota / latencia de Gemini** (nivel gratuito) | Medio | *Timeout* ~20 s; una llamada por examen; *fake* en pruebas |
 | R5 | **Neon:** suspensión por inactividad y cierre de conexiones ociosas | Medio | `pool_pre_ping`, `pool_recycle`, `sslmode=require`; URL *pooled* para la app y directa para Alembic |
