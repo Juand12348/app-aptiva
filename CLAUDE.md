@@ -68,7 +68,7 @@ app/presentation → app/application → app/domain ← app/infrastructure
 ## Base de datos
 
 - **El esquema de Neon ya existe y es la fuente de verdad** (§5 de PROJECT_PLAN.md): `materias`, `componentes`, `niveles_dificultad`, `preguntas`, `opciones_respuesta`, `estudiantes`, `intentos_examen`, `detalle_intento`, `diagnosticos_ia`. Los modelos ORM usan esos nombres exactos de tablas y columnas, en español.
-- No crear tablas nuevas. La única migración de esquema prevista es la contraseña en `estudiantes`. Cualquier otro cambio necesita aprobación.
+- No crear tablas nuevas. Migraciones aplicadas: `0002` (contraseña en `estudiantes`) y `0003` (máximo 1 correcta por pregunta). Cualquier otro cambio necesita aprobación.
 - Una migración nunca borra ni reescribe datos existentes. El *autogenerate* se revisa línea por línea: cualquier `drop_*` o `alter_*` inesperado significa que un modelo no coincide con la BD; se corrige el modelo, no la BD.
 - El backend solo lee las preguntas con `activa = TRUE`.
 - Puntaje por componente: se deriva de `detalle_intento` agrupando por `id_componente`; no se guarda aparte.

@@ -11,6 +11,7 @@ from sqlalchemy import (
     ForeignKey,
     ForeignKeyConstraint,
     Identity,
+    Index,
     Integer,
     SmallInteger,
     String,
@@ -78,6 +79,10 @@ class OpcionRespuesta(Base):
     __table_args__ = (
         UniqueConstraint("id_opcion", "id_pregunta", name="uq_opcion_pregunta"),
         UniqueConstraint("id_pregunta", "texto_opcion", name="uq_texto_opcion_pregunta"),
+        # Migración 0003: como máximo una opción correcta por pregunta.
+        Index(
+            "uq_una_correcta_por_pregunta", "id_pregunta", unique=True, postgresql_where=text("es_correcta")
+        ),
     )
 
     id_opcion: Mapped[int] = identity_pk()

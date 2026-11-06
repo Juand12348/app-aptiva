@@ -189,7 +189,7 @@ diagnosticos_ia     (id_diagnostico PK, id_intento UNIQUE FK, fortalezas, debili
 | Estados | `CHECK (estado IN ('En progreso','Finalizado','Cancelado'))` | Usa `En progreso → Finalizado`. `Cancelado` no se usa (fuera de alcance) |
 | Un diagnóstico por examen | `UNIQUE (id_intento)` | Regenerar = actualizar la fila existente |
 | Dificultad | Tabla `niveles_dificultad` | Se lee el nombre; el enum del dominio se mapea a los nombres reales |
-| 4 opciones, 1 correcta | No hay triggers en la BD | Validado por el script de carga y verificado en Neon; índice único parcial propuesto (§5.5) |
+| 4 opciones, 1 correcta | No hay triggers en la BD | Validado por el script de carga y verificado en Neon; índice único parcial `uq_una_correcta_por_pregunta` (migración 0003) |
 
 ### 5.3 Brechas y migración necesaria
 
@@ -216,7 +216,7 @@ No se crean tablas nuevas.
 
 - **Transformaciones al cargar:** los niveles de los JSON (Básico/Intermedio/Avanzado) se guardaron como Fácil/Medio/Difícil, y los componentes con tilde. Los `id` de los JSON no se usan: la BD genera los suyos.
 - **Opciones mezcladas:** en los JSON la correcta era la B en el 60 % de las preguntas. Al cargar se mezclaron con una semilla fija; ahora la correcta queda en A 33, B 44, C 37 y D 36. La opción de la pregunta 143 que decía "Ambas A y C" se reescribió para no depender del orden.
-- **No hay triggers** en la BD (el comentario del script original los menciona, pero no existen). La regla "1 correcta" solo la garantizan el script de carga y la verificación. Propuesta pendiente de aprobación: agregar `UNIQUE (id_pregunta) WHERE es_correcta` en la migración `0002`.
+- **No hay triggers** en la BD (el comentario del script original los menciona, pero no existen). La regla "máximo 1 correcta" la garantiza el índice único parcial `uq_una_correcta_por_pregunta` (migración `0003`, aplicada 2026-11-06).
 - **El backend no depende de nombres fijos de componentes ni de niveles:** los lee de la BD y los muestra tal cual. Por eso no hay enum `Difficulty` en el dominio.
 - **Pruebas de integración:** usan una *branch* de Neon aparte, creada a partir de la principal (ya trae el banco).
 
