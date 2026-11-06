@@ -5,15 +5,23 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
 from app.application.auth import GetCurrentStudent, Login, RegisterStudent
+from app.application.exams import StartExam, SubmitExam
 from app.domain.entities import Student
 from app.domain.exceptions import AuthenticationError
-from app.domain.ports import StudentRepository, TokenService
+from app.domain.ports import ExamRepository, QuestionRepository, StudentRepository, TokenService
 from app.infrastructure.config import get_settings
 from app.infrastructure.database import get_session, is_database_reachable
-from app.infrastructure.repositories import SqlStudentRepository
+from app.infrastructure.repositories import SqlExamRepository, SqlQuestionRepository, SqlStudentRepository
 from app.infrastructure.security import Argon2PasswordHasher, JwtTokenService
 
-__all__ = ["get_current_student", "get_login", "get_register_student", "is_database_reachable"]
+__all__ = [
+    "get_current_student",
+    "get_login",
+    "get_register_student",
+    "get_start_exam",
+    "get_submit_exam",
+    "is_database_reachable",
+]
 
 password_hasher = Argon2PasswordHasher()
 # auto_error=False: el 401 sale de nuestro manejador, con mensaje en español.
@@ -22,6 +30,25 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=F
 
 def get_student_repository(session: Session = Depends(get_session)) -> StudentRepository:
     return SqlStudentRepository(session)
+
+
+def get_question_repository(session: Session = Depends(get_session)) -> QuestionRepository:
+    return SqlQuestionRepository(session)
+
+
+def get_exam_repository(session: Session = Depends(get_session)) -> ExamRepository:
+    return SqlExamRepository(session)
+
+
+def get_start_exam(
+    questions: QuestionRepository = Depends(get_question_repository),
+    exams: ExamRepository = Depends(get_exam_repository),
+) -> StartExam:
+    return StartExam(questions, exams)
+
+
+def get_submit_exam(exams: ExamRepository = Depends(get_exam_repository)) -> SubmitExam:
+    return SubmitExam(exams)
 
 
 def get_token_service() -> TokenService:

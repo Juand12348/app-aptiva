@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -24,3 +25,48 @@ class StudentResponse(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: Literal["bearer"] = "bearer"
+
+
+class OptionResponse(BaseModel):
+    option_id: int
+    text: str
+
+
+class ExamQuestionResponse(BaseModel):
+    """Sin campo de respuesta correcta: este schema es el que ve el estudiante."""
+
+    question_id: int
+    position: int
+    component: str
+    difficulty: str
+    statement: str
+    options: list[OptionResponse]
+
+
+class StartExamResponse(BaseModel):
+    exam_id: int
+    started_at: datetime
+    questions: list[ExamQuestionResponse]
+
+
+class AnswerRequest(BaseModel):
+    question_id: int
+    option_id: int
+
+
+class SubmitExamRequest(BaseModel):
+    # Las preguntas sin responder simplemente no se envían (cuentan como incorrectas).
+    answers: list[AnswerRequest] = Field(max_length=30)
+
+
+class ComponentScoreResponse(BaseModel):
+    component: str
+    score: int
+    max_score: int
+
+
+class ExamResultResponse(BaseModel):
+    exam_id: int
+    total_score: int
+    max_score: int
+    components: list[ComponentScoreResponse]
