@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.infrastructure.config import get_settings
 from app.infrastructure.database import is_database_reachable
+from app.presentation.errors import register_error_handlers
 from app.presentation.routers import health
 
 logging.basicConfig(level=logging.INFO)
@@ -39,6 +40,7 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    register_error_handlers(app)
     app.include_router(health.router)
     return app
 
