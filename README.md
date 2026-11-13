@@ -51,7 +51,8 @@ Al arrancar debe aparecer `INFO:app:Conectado a la base de datos`.
 | POST | `/api/v1/auth/login` | No | Login (formulario: `username` = correo, `password`) → `access_token` |
 | GET | `/api/v1/students/me` | Sí | Datos del estudiante |
 | GET | `/api/v1/students/me/exams` | Sí | Historial de exámenes enviados |
-| POST | `/api/v1/exams` | Sí | Iniciar examen (30 preguntas, sin la respuesta correcta) |
+| GET | `/api/v1/students/me/stats` | Sí | Estadísticas: evolución, componentes, dificultad y posición en el bloque |
+| POST | `/api/v1/exams` | Sí | Iniciar examen (30 preguntas, sin la respuesta correcta) y `expires_at` |
 | POST | `/api/v1/exams/{exam_id}/submit` | Sí | Enviar respuestas → puntajes + diagnóstico de Gemini |
 | GET | `/api/v1/exams/{exam_id}/result` | Sí | Resultado y diagnóstico de un examen enviado |
 | POST | `/api/v1/exams/{exam_id}/diagnosis` | Sí | Regenerar el diagnóstico (503 si Gemini no responde) |

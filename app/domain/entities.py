@@ -108,3 +108,41 @@ class ExamHistoryItem:
     finished_at: datetime
     result: ExamResult
     has_diagnosis: bool
+
+
+@dataclass(frozen=True)
+class Accuracy:
+    label: str
+    correct: int
+    total: int
+
+    @property
+    def accuracy(self) -> float:
+        return round(self.correct / self.total, 2)
+
+
+@dataclass(frozen=True)
+class EvolutionPoint:
+    exam_id: int
+    finished_at: datetime
+    total_score: int
+    max_score: int
+    component_scores: dict[str, int]
+
+
+@dataclass(frozen=True)
+class ComponentStats:
+    component: str
+    average_score: float
+    latest_score: int
+    max_score: int
+    by_difficulty: list[Accuracy]
+
+
+@dataclass(frozen=True)
+class StudentStats:
+    exams_count: int
+    evolution: list[EvolutionPoint]  # del más antiguo al más reciente
+    components: list[ComponentStats]
+    by_difficulty: list[Accuracy]
+    by_position_in_block: list[Accuracy]

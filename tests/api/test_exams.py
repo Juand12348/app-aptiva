@@ -272,3 +272,33 @@ def test_history_is_per_student(setup: tuple[TestClient, dict[int, int]]) -> Non
     assert client.get("/api/v1/students/me/exams").json() == []
     del app.dependency_overrides[get_current_student]
     assert client.get("/api/v1/students/me/exams").status_code == 401
+
+
+def test_stats_aggregate_finished_exams_of_the_student(setup: tuple[TestClient, dict[int, int]]) -> None:
+    client, correct = setup
+    first = start(client)
+    submit(client, first["exam_id"], [])
+    second = start(client)
+    submit(client, second["exam_id"], all_correct(second, correct))
+    start(client)  # en curso: no cuenta
+
+    response = client.get("/api/v1/students/me/stats")
+    assert response.status_code == 200
+    stats = response.json()
+    assert stats["exams_count"] == 2
+    assert [p["total_score"] for p in stats["evolution"]] == [0, 30]
+    assert [(c["average_score"], c["latest_score"]) for c in stats["components"]] == [(5.0, 10)] * 3
+    assert sum(a["total"] for a in stats["by_difficulty"]) == 60
+    assert [(a["label"], a["total"]) for a in stats["by_position_in_block"]] == [("1-5", 30), ("6-10", 30)]
+
+
+def test_stats_are_per_student_and_require_token(setup: tuple[TestClient, dict[int, int]]) -> None:
+    client, _ = setup
+    exam = start(client)
+    submit(client, exam["exam_id"], [])
+    app.dependency_overrides[get_current_student] = lambda: LUIS
+    empty = client.get("/api/v1/students/me/stats").json()
+    assert empty["exams_count"] == 0
+    assert empty["evolution"] == empty["components"] == empty["by_position_in_block"] == []
+    del app.dependency_overrides[get_current_student]
+    assert client.get("/api/v1/students/me/stats").status_code == 401

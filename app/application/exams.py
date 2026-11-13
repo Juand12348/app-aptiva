@@ -2,10 +2,11 @@ from dataclasses import replace
 from datetime import timedelta
 
 from app.application.diagnosis import GenerateDiagnosis
-from app.domain.entities import ExamHistoryItem, ExamStatus, StartedExam, SubmittedExam
+from app.domain.entities import ExamHistoryItem, ExamStatus, StartedExam, StudentStats, SubmittedExam
 from app.domain.exceptions import ConflictError, NotFoundError
 from app.domain.ports import DiagnosisRepository, ExamRepository, QuestionRepository
 from app.domain.scoring import QUESTIONS_PER_COMPONENT, arrange_exam, grade_exam
+from app.domain.stats import build_stats
 
 
 class StartExam:
@@ -57,3 +58,11 @@ class ListStudentExams:
 
     def execute(self, student_id: int) -> list[ExamHistoryItem]:
         return self.exams.list_finished(student_id)
+
+
+class GetStudentStats:
+    def __init__(self, exams: ExamRepository) -> None:
+        self.exams = exams
+
+    def execute(self, student_id: int) -> StudentStats:
+        return build_stats(self.exams.list_finished(student_id))

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.application.auth import GetCurrentStudent, Login, RegisterStudent
 from app.application.diagnosis import GenerateDiagnosis, RegenerateDiagnosis
-from app.application.exams import GetExamResult, ListStudentExams, StartExam, SubmitExam
+from app.application.exams import GetExamResult, GetStudentStats, ListStudentExams, StartExam, SubmitExam
 from app.domain.entities import Student
 from app.domain.exceptions import AuthenticationError
 from app.domain.ports import (
@@ -36,6 +36,7 @@ __all__ = [
     "get_get_exam_result",
     "get_list_student_exams",
     "get_login",
+    "get_student_stats",
     "get_regenerate_diagnosis",
     "get_register_student",
     "get_start_exam",
@@ -97,6 +98,10 @@ def get_get_exam_result(
     diagnoses: DiagnosisRepository = Depends(get_diagnosis_repository),
 ) -> GetExamResult:
     return GetExamResult(exams, diagnoses)
+
+
+def get_student_stats(exams: ExamRepository = Depends(get_exam_repository)) -> GetStudentStats:
+    return GetStudentStats(exams)
 
 
 def get_list_student_exams(exams: ExamRepository = Depends(get_exam_repository)) -> ListStudentExams:

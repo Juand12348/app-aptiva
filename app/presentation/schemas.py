@@ -97,3 +97,36 @@ class ExamHistoryItemResponse(BaseModel):
     max_score: int
     components: list[ComponentScoreResponse]
     has_diagnosis: bool
+
+
+class AccuracyResponse(BaseModel):
+    label: str
+    correct: int
+    total: int
+    accuracy: float = Field(description="Aciertos / total, entre 0 y 1")
+
+
+class EvolutionPointResponse(BaseModel):
+    exam_id: int
+    finished_at: datetime
+    total_score: int
+    max_score: int
+    component_scores: dict[str, int]
+
+
+class ComponentStatsResponse(BaseModel):
+    component: str
+    average_score: float
+    latest_score: int
+    max_score: int
+    by_difficulty: list[AccuracyResponse]
+
+
+class StudentStatsResponse(BaseModel):
+    exams_count: int
+    evolution: list[EvolutionPointResponse] = Field(description="Del examen más antiguo al más reciente")
+    components: list[ComponentStatsResponse]
+    by_difficulty: list[AccuracyResponse]
+    by_position_in_block: list[AccuracyResponse] = Field(
+        description="Aciertos en las preguntas 1-5 frente a 6-10 de cada componente; señal orientativa de fatiga"
+    )

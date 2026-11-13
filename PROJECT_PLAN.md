@@ -112,6 +112,8 @@ El dominio no importa FastAPI, SQLAlchemy, Pydantic, el SDK de Gemini ni librer�
 5. GET  /exams/{id}/result             → datos del dashboard
 6. POST /exams/{id}/diagnosis          → regenera diagnóstico si falló
 7. GET  /students/me/exams             → historial
+8. GET  /students/me/stats             → estadísticas: evolución, radar por componente, dificultad,
+                                          posición en el bloque (calculadas por el backend)
 ```
 
 ---
@@ -121,7 +123,7 @@ El dominio no importa FastAPI, SQLAlchemy, Pydantic, el SDK de Gemini ni librer�
 | Módulo | Responsabilidad | No hace |
 |--------|-----------------|---------|
 | `auth` | Registro, login, hash/verificación de contraseña, emisión y validación de JWT, resolver el estudiante actual | Roles, recuperación de contraseña |
-| `students` | Datos del estudiante (`/students/me`) | Autenticación (la hace `auth`) |
+| `students` | Datos del estudiante (`/students/me`) y sus estadísticas (`/students/me/stats`) | Autenticación (la hace `auth`) |
 | `question_bank` | Mapear las tablas del banco existentes en Neon; consultar preguntas al azar por componente | Crear o editar preguntas |
 | `exams` (motor de evaluación) | Generar examen, recibir respuestas, calificar, puntaje global y por componente, historial | Llamar a Gemini directamente |
 | `diagnosis` | Armar el resumen de resultados, llamar a Gemini, validar la respuesta, guardar el diagnóstico | Calcular puntajes |
@@ -230,7 +232,8 @@ No se crean tablas nuevas.
 | POST | `/api/v1/auth/login` | — | Login (formulario OAuth2) → `{access_token, token_type}` |
 | GET | `/api/v1/students/me` | ✔ | Datos del estudiante actual |
 | GET | `/api/v1/students/me/exams` | ✔ | Historial: fecha, puntaje global, puntajes por componente |
-| POST | `/api/v1/exams` | ✔ | Iniciar examen (30 preguntas, sin respuesta correcta) |
+| GET | `/api/v1/students/me/stats` | ✔ | Estadísticas: evolución, promedio por componente, precisión por dificultad y por posición en el bloque |
+| POST | `/api/v1/exams` | ✔ | Iniciar examen (30 preguntas, sin respuesta correcta) y `expires_at` (límite de 60 min configurable) |
 | POST | `/api/v1/exams/{exam_id}/submit` | ✔ | Enviar respuestas → puntajes (+ diagnóstico si Gemini responde) |
 | GET | `/api/v1/exams/{exam_id}/result` | ✔ | Datos del dashboard: global, por componente, por dificultad, diagnóstico |
 | POST | `/api/v1/exams/{exam_id}/diagnosis` | ✔ | Regenerar diagnóstico |
@@ -265,11 +268,12 @@ aptiva-backend/
 │   ├── domain/
 │   │   ├── entities.py             # dataclasses y enums
 │   │   ├── scoring.py              # funciones puras de calificación
+│   │   ├── stats.py                # estadísticas del estudiante (función pura)
 │   │   ├── ports.py                # Protocols: repositorios, DiagnosisGenerator, PasswordHasher, TokenService
 │   │   └── exceptions.py
 │   ├── application/
 │   │   ├── auth.py                 # RegisterStudent, Login
-│   │   ├── exams.py                # StartExam, SubmitExam, GetExamResult, ListStudentExams
+│   │   ├── exams.py                # StartExam, SubmitExam, GetExamResult, ListStudentExams, GetStudentStats
 │   │   └── diagnosis.py            # GenerateDiagnosis
 │   ├── infrastructure/
 │   │   ├── config.py               # Settings
