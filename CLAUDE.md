@@ -39,7 +39,7 @@ app/presentation → app/application → app/domain ← app/infrastructure
 - Un puerto (`Protocol`) solo cuando hay una dependencia externa real (BD, Gemini, hash, JWT). Nada de interfaces "por si acaso".
 - Nada de repositorios genéricos, *Unit of Work*, buses de eventos, CQRS, fábricas abstractas ni contenedores de inyección de dependencias.
 - Un archivo por capa y módulo; dividir en paquete solo al pasar ~300 líneas.
-- No agregar funcionalidades fuera del plan: roles, recuperación de contraseña, *refresh tokens*, verificación de correo, CRUD de preguntas por API, examen adaptativo, colas, caché, temporizador, frontend. Si parece necesario, preguntar primero.
+- No agregar funcionalidades fuera del plan: roles, recuperación de contraseña, *refresh tokens*, verificación de correo, CRUD de preguntas por API, examen adaptativo, colas, caché, frontend. Si parece necesario, preguntar primero.
 - Preferir la biblioteca estándar y lo que ya existe en el código antes de escribir algo nuevo.
 
 ## Reglas de negocio no negociables
@@ -47,6 +47,7 @@ app/presentation → app/application → app/domain ← app/infrastructure
 - El banco tiene 3 componentes: Estadística, Geometría, Cálculo y Álgebra; ≥50 preguntas cada uno. **Ya está cargado en Neon** (`scripts/load_question_bank.py`, carga única desde `data/*.json`): la API solo lo lee; nunca inserta, modifica ni borra preguntas.
 - Cada pregunta: exactamente 4 opciones, exactamente 1 correcta. Dificultades en la BD: `Fácil`, `Medio`, `Difícil` (se leen de `niveles_dificultad`, no se fijan en el código).
 - Examen: 30 preguntas = 10 aleatorias por componente, sin repetir.
+- Tiempo límite: `EXAM_TIME_LIMIT_MINUTES` (60 por defecto). `POST /exams` devuelve `expires_at` (`fecha_inicio` + límite); el envío tardío se califica igual, nunca se rechaza.
 - Puntaje global sobre 30; por componente sobre 10. Sin responder = incorrecta.
 - Los puntajes los calcula **el backend**. Gemini solo interpreta resultados; nunca califica.
 - Un examen se envía una sola vez (`'En progreso' → 'Finalizado'`); un segundo envío responde 409.

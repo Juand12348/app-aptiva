@@ -1,5 +1,6 @@
 """Único punto donde la presentación se conecta con la infraestructura."""
 
+from datetime import timedelta
 from functools import lru_cache
 
 from fastapi import Depends
@@ -81,7 +82,7 @@ def get_start_exam(
     questions: QuestionRepository = Depends(get_question_repository),
     exams: ExamRepository = Depends(get_exam_repository),
 ) -> StartExam:
-    return StartExam(questions, exams)
+    return StartExam(questions, exams, timedelta(minutes=get_settings().exam_time_limit_minutes))
 
 
 def get_submit_exam(

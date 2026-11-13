@@ -46,6 +46,7 @@ class ExamQuestionResponse(BaseModel):
 class StartExamResponse(BaseModel):
     exam_id: int
     started_at: datetime
+    expires_at: datetime
     questions: list[ExamQuestionResponse]
 
 

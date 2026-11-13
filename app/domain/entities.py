@@ -39,6 +39,7 @@ class StartedExam:
     id: int
     started_at: datetime
     questions: list[Question]  # en orden de presentación (posición 1..30)
+    expires_at: datetime | None = None  # lo fija StartExam; el repositorio no lo conoce
 
 
 @dataclass(frozen=True)

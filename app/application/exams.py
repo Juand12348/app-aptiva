@@ -1,3 +1,6 @@
+from dataclasses import replace
+from datetime import timedelta
+
 from app.application.diagnosis import GenerateDiagnosis
 from app.domain.entities import ExamHistoryItem, ExamStatus, StartedExam, SubmittedExam
 from app.domain.exceptions import ConflictError, NotFoundError
@@ -6,13 +9,16 @@ from app.domain.scoring import QUESTIONS_PER_COMPONENT, arrange_exam, grade_exam
 
 
 class StartExam:
-    def __init__(self, questions: QuestionRepository, exams: ExamRepository) -> None:
+    def __init__(self, questions: QuestionRepository, exams: ExamRepository, time_limit: timedelta) -> None:
         self.questions = questions
         self.exams = exams
+        self.time_limit = time_limit
 
     def execute(self, student_id: int) -> StartedExam:
         selected = arrange_exam(self.questions.pick_random(QUESTIONS_PER_COMPONENT))
-        return self.exams.create(student_id, selected)
+        exam = self.exams.create(student_id, selected)
+        # Política: el envío tardío se califica igual; el límite solo lo informa al cliente.
+        return replace(exam, expires_at=exam.started_at + self.time_limit)
 
 
 class SubmitExam:

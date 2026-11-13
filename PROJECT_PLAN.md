@@ -49,7 +49,7 @@ El esquema completo ya existe en Neon (9 tablas, nombres en español) y es la fu
 
 ### 1.5 Fuera de alcance (no se construye)
 
-Frontend, roles/administración, recuperación de contraseña, *refresh tokens*, verificación de correo, CRUD de preguntas por API, examen adaptativo por dificultad, temporizador, guardado parcial de respuestas, colas o *workers*, caché, despliegue.
+Frontend, roles/administración, recuperación de contraseña, *refresh tokens*, verificación de correo, CRUD de preguntas por API, examen adaptativo por dificultad, guardado parcial de respuestas, colas o *workers*, caché, despliegue.
 
 ---
 

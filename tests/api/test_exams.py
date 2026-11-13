@@ -1,9 +1,11 @@
 from collections.abc import Iterator
+from datetime import datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.domain.entities import Student
+from app.infrastructure.config import get_settings
 from app.main import app
 from app.presentation.dependencies import (
     get_current_student,
@@ -71,6 +73,14 @@ def test_start_exam_returns_30_questions_10_per_component(setup: tuple[TestClien
     components = [q["component"] for q in questions]
     assert {components.count(c) for c in set(components)} == {10}
     assert all(len(q["options"]) == 4 for q in questions)
+
+
+def test_start_exam_expires_after_time_limit(setup: tuple[TestClient, dict[int, int]]) -> None:
+    client, _ = setup
+    exam = start(client)
+    started = datetime.fromisoformat(exam["started_at"])
+    expires = datetime.fromisoformat(exam["expires_at"])
+    assert expires - started == timedelta(minutes=get_settings().exam_time_limit_minutes)
 
 
 def test_start_exam_never_exposes_correct_answer(setup: tuple[TestClient, dict[int, int]]) -> None:

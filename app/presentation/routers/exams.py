@@ -70,6 +70,7 @@ def start_exam(
     return StartExamResponse(
         exam_id=exam.id,
         started_at=exam.started_at,
+        expires_at=exam.expires_at,
         questions=[
             ExamQuestionResponse(
                 question_id=question.id,
